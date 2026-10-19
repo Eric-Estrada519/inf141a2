@@ -1,30 +1,85 @@
 import re
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urljoin, urldefrag
+from bs4 import BeautifulSoup
+
+# Domains the assignment permits crawling.
+_ALLOWED_DOMAINS = {
+    "ics.uci.edu",
+    "cs.uci.edu",
+    "informatics.uci.edu",
+    "stat.uci.edu",
+}
+
+
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
     return [link for link in links if is_valid(link)]
 
 def extract_next_links(url, resp):
-    # Implementation required.
-    # url: the URL that was used to get the page
-    # resp.url: the actual url of the page
-    # resp.status: the status code returned by the server. 200 is OK, you got the page. Other numbers mean that there was some kind of problem.
-    # resp.error: when status is not 200, you can check the error here, if needed.
-    # resp.raw_response: this is where the page actually is. More specifically, the raw_response has two parts:
-    #         resp.raw_response.url: the url, again
-    #         resp.raw_response.content: the content of the page!
-    # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
-    return list()
+    # Return [] for any response we cannot or should not parse.
+    if resp.status != 200 or resp.raw_response is None:
+        return []
+
+    content = resp.raw_response.content
+
+
+    # Skip non-HTML responses when the server tells us the type explicitly.
+    content_type = resp.raw_response.headers.get("Content-Type", "")
+    if content_type and "text/html" not in content_type:
+        return []
+
+    # Parse with lxml for speed; fall back to the pure-Python parser if lxml
+    # is not available or chokes on the markup.
+    try:
+        soup = BeautifulSoup(content, "lxml")
+    except Exception:
+        soup = BeautifulSoup(content, "html.parser")
+
+    # Use the final URL after any redirects as the base for relative links.
+    base_url = resp.raw_response.url
+    seen = set()
+
+    for tag in soup.find_all("a", href=True):
+        href = tag["href"].strip()
+        if not href:
+            continue
+
+        # Resolve relative URLs against the post-redirect base.
+        absolute = urljoin(base_url, href)
+
+        # Drop the fragment — two URLs that differ only by fragment are the
+        # same page, and fragments are never sent to the server.
+        defragmented, _ = urldefrag(absolute)
+
+        if defragmented:
+            seen.add(defragmented)
+
+    return list(seen)
 
 def is_valid(url):
-    # Decide whether to crawl this url or not. 
-    # If you decide to crawl it, return True; otherwise return False.
-    # There are already some conditions that return False.
+    # Decide whether to crawl this url or not.
+    # Returns True only for http/https URLs on the four allowed UCI domains
+    # (or their subdomains) that are not binary/media file downloads.
     try:
         parsed = urlparse(url)
-        if parsed.scheme not in set(["http", "https"]):
+
+        if parsed.scheme not in {"http", "https"}:
             return False
+
+        # Normalise host to lower case before any comparison.
+        host = parsed.netloc.lower()
+        # Strip an explicit port .
+        host = host.split(":")[0]
+
+        # Accept the host only if it equals an allowed domain exactly, or if
+        # it ends with ".<domain>". The dot prefix is required.
+        if not any(
+            host == domain or host.endswith("." + domain)
+            for domain in _ALLOWED_DOMAINS
+        ):
+            return False
+
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
@@ -33,8 +88,11 @@ def is_valid(url):
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz"
+            + r"|ppsx|odc|sql|mpg|war|apk|img|bam)$",
+            parsed.path.lower(),
+        )
 
     except TypeError:
-        print ("TypeError for ", parsed)
-        raise
+        print("TypeError for", url)
+        return False
