@@ -68,6 +68,20 @@ _BLOCKED_EXTENSIONS = frozenset({
     "rm", "smil", "wmv", "swf", "wma", "zip", "rar", "gz",
     "ppsx", "odc", "sql", "mpg", "war", "apk", "img", "bam",
     "c", "cc", "cpp", "h", "hpp",
+    # VM and disk images that are multi GB downloads that crash the crawler
+    "ova", "ovf", "vmdk", "vdi", "qcow2", "vhd", "vhdx",
+    # Other compressed archives and software installers
+    "xz", "lz", "lzma", "zst", "txz", "tbz", "tbz2", "deb", "rpm", "pkg",
+    # Research data and ML model files that can be hundreds of MB
+    "npy", "npz", "h5", "hdf5", "mat", "pkl", "pickle", "parquet", "pt",
+    "pth", "ckpt", "onnx", "safetensors", "pcap", "nc", "sav", "rds",
+    # Audio, video, image, and font formats the list above missed
+    "webm", "flv", "mkv", "3gp", "flac", "aac", "m4a", "webp", "heic",
+    "svg", "woff", "woff2", "ttf", "otf",
+    # Compiled binaries and office formats with no useful HTML text
+    "o", "so", "a", "lib", "obj", "class", "wasm", "odt", "ods", "odp",
+    "key", "pages",
+    "py", "java", "ipynb", "pps",
 })
 
 # Robots.txt set that track which domains have been queued, and store the
@@ -187,7 +201,8 @@ def scraper(url, resp):
 
         if is_html and not is_robots and not is_xml:
             content = resp.raw_response.content
-            if not content:
+            # Skip empty pages and huge pages so they aren't tokenized or counted.
+            if not content or len(content) > MAX_CONTENT_BYTES:
                 return []
 
             final_url = resp.raw_response.url

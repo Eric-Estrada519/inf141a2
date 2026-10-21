@@ -117,6 +117,33 @@ class Stats:
             for host, urls in self._subdomains.items()
         )
 
+    def host_counts(self):
+        # page count per host (all domains), most pages first.
+        counts = Counter(urlparse(u).netloc.lower().split(":")[0] for u in self._pages)
+        return sorted(counts.items(), key=lambda pair: (-pair[1], pair[0]))
+
+    def report(self):
+        # all four assignment answers plus pages per host, as one string.
+        lines = [f"Unique pages: {self.unique_count()}"]
+
+        longest = self.longest_page()
+        if longest:
+            lines.append(f"Longest page: {longest[0]} ({longest[1]} words)")
+
+        lines.append("\nTop 50 words:")
+        for i, (word, count) in enumerate(self.top_words(50), 1):
+            lines.append(f"{i}. {word} - {count}")
+
+        subdomains = self.ics_subdomains()
+        lines.append(f"\nics.uci.edu subdomains: {len(subdomains)}")
+        for url, count in subdomains:
+            lines.append(f"{url}, {count}")
+
+        lines.append("\nPages per host:")
+        for host, count in self.host_counts():
+            lines.append(f"{count} {host}")
+        return "\n".join(lines)
+
     def save(self, path):
         data = {
             "pages": self._pages,
@@ -139,3 +166,9 @@ class Stats:
         )
         s._anchor_text = defaultdict(list, data.get("anchor_text", {}))
         return s
+
+
+# Print the report: python3 analytics.py [stats.json]
+if __name__ == "__main__":
+    import sys
+    print(Stats.load(sys.argv[1] if len(sys.argv) > 1 else "stats.json").report())
