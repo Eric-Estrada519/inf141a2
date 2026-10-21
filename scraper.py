@@ -1,4 +1,6 @@
+import re
 import hashlib
+from collections import Counter
 from os.path import splitext
 from urllib.parse import urlparse, urljoin, urldefrag, parse_qs
 from bs4 import BeautifulSoup
@@ -43,7 +45,12 @@ MAX_CONTENT_BYTES = 5 * 1024 * 1024  # 5 MB
 # login/edit forms, calendar feeds, social-share variants, and wiki diffs.
 _TRAP_QUERY_KEYS = frozenset({
     "share", "ical", "outlook-ical", "tribe-bar-date", "replytocom", "rev",
+    # Wiki revision and format variants — one URL per edit/format
+    "version", "format",
+    # DokuWiki media manager
     "tab_files", "tab_details", "image",
+    # Apache directory listing sort order  same directory, 4 sort variants
+    "C",
 })
 
 # File extensions that are never worth downloading
@@ -58,12 +65,59 @@ _BLOCKED_EXTENSIONS = frozenset({
     "tgz", "sha1", "thmx", "mso", "arff", "rtf", "jar", "csv",
     "rm", "smil", "wmv", "swf", "wma", "zip", "rar", "gz",
     "ppsx", "odc", "sql", "mpg", "war", "apk", "img", "bam",
+    "c", "cc", "cpp", "h", "hpp",
 })
 
 # Robots.txt set that track which domains have been queued, and store the
 # parsed Disallow rules so is_valid() can honour them.
 _robots_queued: set = set()          # scheme://host values already queued
 _robots_rules: dict = {}             # host -> list of disallowed path prefixes
+
+# Frequency based path prefix trap detection. After _PREFIX_TRAP_THRESHOLD
+# pages are crawled under the same two-segment path prefix, that prefix is
+# flagged as a trap and all future URLs under it are rejected.
+_path_hit_counts: dict = {}
+_trap_prefixes: set = set()
+_PREFIX_TRAP_THRESHOLD = 100
+
+# Per-domain page cap. Stops the crawler from sinking unlimited pages into
+# a single subdomain that turns out to be a trap or simply very deep.
+_domain_page_counts: dict = {}       # host -> int
+_DOMAIN_CAP = 500
+
+# Anchor text collected during the most recent extract_next_links call.
+# Cleared each call so scraper() can merge it into stats before filtering.
+_pending_anchors: dict = {}
+
+# URL shape cap so digits in the path are replaced with # so that
+# /events/2024/05/01 and /events/2024/06/15 share the shape /events/#/#/#.
+# Once a shape hits _SHAPE_CAP the URL is rejected — catches calendar and
+# directory traps that no specific rule predicted.
+_shape_counts: Counter = Counter()
+_SHAPE_CAP = 50
+
+# URLs with more than this many distinct query parameters are almost always
+# filter/sort combination traps, not real pages.
+_MAX_QUERY_PARAMS = 3
+
+
+def _path_prefix(path):
+    segs = [s for s in path.split("/") if s]
+    return "/" + "/".join(segs[:2]) if segs else "/"
+
+
+# Rebuild in-memory trap counters from pages the previous run already crawled.
+# On a fresh start stats._pages is empty so this is a no-op.
+if stats._pages:
+    for _u in stats._pages:
+        _p = urlparse(_u)
+        _h = _p.netloc.lower().split(":")[0]
+        _domain_page_counts[_h] = _domain_page_counts.get(_h, 0) + 1
+        _pf = _path_prefix(_p.path)
+        _path_hit_counts[_pf] = _path_hit_counts.get(_pf, 0) + 1
+        if _path_hit_counts[_pf] >= _PREFIX_TRAP_THRESHOLD:
+            _trap_prefixes.add(_pf)
+        _shape_counts[re.sub(r"\d+", "#", _p.netloc + _p.path)] += 1
 
 
 def _parse_robots_txt(content_bytes):
@@ -125,6 +179,11 @@ def scraper(url, resp):
         _robots_queued.add(base)
         links.append(base + "/robots.txt")
 
+    # Persist anchor text collected during link extraction.
+    for target_url, anchors in _pending_anchors.items():
+        for anchor in anchors:
+            stats.add_anchor(target_url, anchor)
+
     # Only record HTML content pages in stats.
     if resp.status == 200 and resp.raw_response is not None:
         content_type = resp.raw_response.headers.get("Content-Type", "")
@@ -149,12 +208,20 @@ def scraper(url, resp):
             if stats.unique_count() % _SAVE_INTERVAL == 0:
                 stats.save(_STATS_PATH)
 
+            parsed_final = urlparse(final_url)
+            crawled_host = parsed_final.netloc.lower().split(":")[0]
+            _domain_page_counts[crawled_host] = _domain_page_counts.get(crawled_host, 0) + 1
+            prefix = _path_prefix(parsed_final.path)
+            _path_hit_counts[prefix] = _path_hit_counts.get(prefix, 0) + 1
+            if _path_hit_counts[prefix] >= _PREFIX_TRAP_THRESHOLD:
+                _trap_prefixes.add(prefix)
+
             # Count the page as visited but don't follow its links when it
             # has too few words since near-empty pages rarely lead anywhere useful.
             if len(words) < _MIN_WORD_COUNT:
                 return []
 
-            # Near duplicate detectio that skip pages whose token fingerprint is
+            # Near duplicate detection that skip pages whose token fingerprint is
             # within _SIMHASH_THRESHOLD bits of any page already seen.
             fp = simhash(words)
             if any(hamming_distance(fp, seen) <= _SIMHASH_THRESHOLD
@@ -166,6 +233,8 @@ def scraper(url, resp):
 
 
 def extract_next_links(url, resp):
+    _pending_anchors.clear()
+
     if resp.status != 200 or resp.raw_response is None:
         return []
 
@@ -210,11 +279,12 @@ def extract_next_links(url, resp):
             continue
 
         # Resolve relative URLs against the post redirect base.
-        absolute = urljoin(base_url, href)
-
-        # Drop the fragment: two URLs that differ only by fragment are the
-        # same page, and fragments are never sent to the server.
-        defragmented, _ = urldefrag(absolute)
+        # Bracket expressions like [YOUR_IP] raise ValueError in Python 3.10+.
+        try:
+            absolute = urljoin(base_url, href)
+            defragmented, _ = urldefrag(absolute)
+        except ValueError:
+            continue
 
         # Skip non-ASCII URLs since the cache server only accepts ASCII requests.
         try:
@@ -224,6 +294,9 @@ def extract_next_links(url, resp):
 
         if defragmented:
             seen.add(defragmented)
+            anchor = tag.get_text(strip=True)
+            if anchor:
+                _pending_anchors.setdefault(defragmented, []).append(anchor)
 
     return list(seen)
 
@@ -238,7 +311,7 @@ def is_valid(url):
         if parsed.scheme not in {"http", "https"}:
             return False
 
-        # Trap catch that checks longs URLS since very long URLs
+        # Trap catch that checks long URLs since very long URLs
         # are almost always generated by crawl traps
         if len(url) > 300:
             return False
@@ -259,7 +332,20 @@ def is_valid(url):
             if any(path.startswith(rule) for rule in _robots_rules[host]):
                 return False
 
-        # Trap catch that checks if any path segment that repeats 3+ times signals a depth trap
+        # Stop crawling a domain that has already yielded too many pages.
+        if _domain_page_counts.get(host, 0) >= _DOMAIN_CAP:
+            return False
+
+        # Reject URLs under a path prefix that has been flagged as a trap.
+        if _path_prefix(parsed.path) in _trap_prefixes:
+            return False
+
+        # Trap catch so bare date paths are calendar pages (one URL per day/month).
+        # News articles have a slug after the date and are NOT blocked.
+        if re.search(r"/\d{4}/\d{2}(/\d{2})?/?$", parsed.path):
+            return False
+        if re.search(r"/\d{4}-\d{2}-\d{2}", parsed.path):
+            return False
 
         path_segments = [s for s in parsed.path.split("/") if s]
         if path_segments and max(path_segments.count(s) for s in set(path_segments)) >= 3:
@@ -270,10 +356,21 @@ def is_valid(url):
         query = parse_qs(parsed.query, keep_blank_values=True)
         if any(k in query for k in _TRAP_QUERY_KEYS):
             return False
-        if any(v in {"login", "edit"} for v in query.get("action", [])):
+        if any(v in {"login", "edit", "history", "diff", "attach"} for v in query.get("action", [])):
             return False
         if "diff" in query.get("do", []):
             return False
+
+        # Too many query parameters signals a filter/sort combination trap.
+        if len(query) > _MAX_QUERY_PARAMS:
+            return False
+
+        # URL shape cap so it replaces digits with # and reject once a shape is
+        # seen too many times it catches unpredicted calendar/directory traps.
+        shape = re.sub(r"\d+", "#", parsed.netloc + parsed.path)
+        if _shape_counts[shape] >= _SHAPE_CAP:
+            return False
+        _shape_counts[shape] += 1
 
         _, ext = splitext(parsed.path.lower())
         return ext.lstrip(".") not in _BLOCKED_EXTENSIONS

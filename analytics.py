@@ -36,7 +36,10 @@ STOP_WORDS = {
 def visible_text(html_bytes):
     # Strip tags whose content is never visible to the user, then return
     # the remaining text with words separated by a single space.
-    soup = BeautifulSoup(html_bytes, "lxml")
+    try:
+        soup = BeautifulSoup(html_bytes, "lxml")
+    except Exception:
+        soup = BeautifulSoup(html_bytes, "html.parser")
     for tag in soup(["script", "style", "noscript"]):
         tag.decompose()
     return soup.get_text(" ")
@@ -56,6 +59,8 @@ class Stats:
         self._word_counts = Counter()
         # ics host is a set of unique page URLs.
         self._subdomains = defaultdict(set)
+        # target url -> list of anchor texts pointing at it
+        self._anchor_text = defaultdict(list)
 
     def add_page(self, url, words):
         # Defragment so /page and /page#section count as one URL.
@@ -73,6 +78,15 @@ class Stats:
         host = urlparse(url).netloc.lower().split(":")[0]
         if host == "ics.uci.edu" or host.endswith(".ics.uci.edu"):
             self._subdomains[host].add(url)
+
+    def add_anchor(self, target_url, anchor):
+        target_url, _ = urldefrag(target_url)
+        if anchor:
+            self._anchor_text[target_url].append(anchor)
+
+    def anchor_text(self, url):
+        url, _ = urldefrag(url)
+        return list(self._anchor_text.get(url, []))
 
     def unique_count(self):
         # how many unique pages were crawled.
@@ -105,8 +119,8 @@ class Stats:
         data = {
             "pages": self._pages,
             "word_counts": dict(self._word_counts),
-            # Sets are not JSONserializable so its convert to lists.
             "subdomains": {h: list(u) for h, u in self._subdomains.items()},
+            "anchor_text": dict(self._anchor_text),
         }
         with open(path, "w") as f:
             json.dump(data, f)
@@ -121,4 +135,5 @@ class Stats:
         s._subdomains = defaultdict(
             set, {h: set(u) for h, u in data["subdomains"].items()}
         )
+        s._anchor_text = defaultdict(list, data.get("anchor_text", {}))
         return s
