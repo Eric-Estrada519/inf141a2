@@ -86,11 +86,11 @@ _BLOCKED_EXTENSIONS = frozenset({
 
 # Robots.txt set that track which domains have been queued, and store the
 # parsed Disallow rules so is_valid() can honour them.
-_robots_queued: set = set()          # scheme://host values already queued
-_robots_rules: dict = {}             # host -> list of disallowed path prefixes
+_robots_queued: set = set()          # host values already queued
+_robots_rules: dict = {}             # host key is a list of disallowed path prefixes
 
 # Per-host prefix trap: too many pages under one prefix gets it blocked.
-_path_hit_counts: Counter = Counter()    # (host, prefix) -> count
+_path_hit_counts: Counter = Counter()    # (host, prefix) get counted
 _trap_prefixes: set = set()              # (host, prefix) pairs
 _PREFIX_TRAP_THRESHOLD = 300
 
@@ -103,7 +103,7 @@ _DOMAIN_CAP = 3000
 _pending_anchors: dict = {}
 
 # Shape cap: digits become #, max _SHAPE_CAP distinct URLs per shape.
-_shape_urls: defaultdict = defaultdict(set)   # shape -> URLs
+_shape_urls: defaultdict = defaultdict(set)   # shape matches to URLs
 _SHAPE_CAP = 50
 
 # URLs with more than this many distinct query parameters are almost always
@@ -388,6 +388,13 @@ def is_valid(url):
 
         _, ext = splitext(parsed.path.lower())
         if ext.lstrip(".") in _BLOCKED_EXTENSIONS:
+            return False
+
+        # WordPress attachment pages are one near empty HTML page per uploaded
+        # image, with slugs like /cropped-logo-png or /attachment/photo.
+        if re.search(r"-(jpe?g|png|gif|bmp|webp|svg)/?$", parsed.path.lower()):
+            return False
+        if "/attachment/" in parsed.path.lower() or "attachment_id" in query:
             return False
 
         # Shape cap so it count distinct URLs only, so repeat links don't use it up.
