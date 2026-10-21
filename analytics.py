@@ -64,9 +64,10 @@ class Stats:
 
     def add_page(self, url, words):
         # Defragment so /page and /page#section count as one URL.
+        # Returns True if the page was new.
         url, _ = urldefrag(url)
         if url in self._pages:
-            return
+            return False
 
         self._pages[url] = len(words)
 
@@ -78,6 +79,7 @@ class Stats:
         host = urlparse(url).netloc.lower().split(":")[0]
         if host == "ics.uci.edu" or host.endswith(".ics.uci.edu"):
             self._subdomains[host].add(url)
+        return True
 
     def add_anchor(self, target_url, anchor):
         target_url, _ = urldefrag(target_url)
