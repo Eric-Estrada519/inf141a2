@@ -43,6 +43,7 @@ MAX_CONTENT_BYTES = 5 * 1024 * 1024  # 5 MB
 # login/edit forms, calendar feeds, social-share variants, and wiki diffs.
 _TRAP_QUERY_KEYS = frozenset({
     "share", "ical", "outlook-ical", "tribe-bar-date", "replytocom", "rev",
+    "tab_files", "tab_details", "image",
 })
 
 # File extensions that are never worth downloading
