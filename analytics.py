@@ -36,6 +36,13 @@ STOP_WORDS = {
 def visible_text(html_bytes):
     # Strip tags whose content is never visible to the user, then return
     # the remaining text with words separated by a single space.
+    # Old Word exported pages can be UTF-16 with no BOM, so every other byte
+    # is a null. Undecoded, they turn into single letter garbage tokens.
+    if isinstance(html_bytes, bytes):
+        if html_bytes[1:400:2].count(0) > 100:
+            html_bytes = html_bytes.decode("utf-16-le", errors="ignore")
+        elif html_bytes[0:400:2].count(0) > 100:
+            html_bytes = html_bytes.decode("utf-16-be", errors="ignore")
     try:
         soup = BeautifulSoup(html_bytes, "lxml")
     except Exception:
@@ -104,9 +111,11 @@ class Stats:
 
     def top_words(self, n=50):
         # n most frequent non-stop words.
+        # Pure numbers and single characters are skipped since they aren't words.
         # Ties are broken alphabetically so the result is deterministic.
         return sorted(
-            self._word_counts.items(),
+            ((w, c) for w, c in self._word_counts.items()
+             if len(w) > 1 and not w.isdigit()),
             key=lambda pair: (-pair[1], pair[0]),
         )[:n]
 
