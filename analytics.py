@@ -1,3 +1,4 @@
+import os
 import re
 import json
 from collections import Counter, defaultdict
@@ -68,8 +69,15 @@ class Stats:
         self._subdomains = defaultdict(set)
         # target url -> list of anchor texts pointing at it
         self._anchor_text = defaultdict(list)
+        # URLs whose content duplicated an earlier page. They count as unique
+        # pages but their words and length are left out of the report.
+        self._duplicates = set()
+        # MD5 hashes and SimHash fingerprints of pages seen so far, saved so
+        # duplicate detection survives a restart.
+        self._seen_hashes = set()
+        self._seen_fingerprints = []
 
-    def add_page(self, url, words):
+    def add_page(self, url, words, duplicate=False):
         # Defragment so /page and /page#section count as one URL.
         # Returns True if the page was new.
         url, _ = urldefrag(url)
@@ -78,9 +86,12 @@ class Stats:
 
         self._pages[url] = len(words)
 
-        for word in words:
-            if word not in STOP_WORDS:
-                self._word_counts[word] += 1
+        if duplicate:
+            self._duplicates.add(url)
+        else:
+            for word in words:
+                if word not in STOP_WORDS:
+                    self._word_counts[word] += 1
 
         # Track ics.uci.edu subdomains separately.
         host = urlparse(url).netloc.lower().split(":")[0]
@@ -102,11 +113,12 @@ class Stats:
         return len(self._pages)
 
     def longest_page(self):
-        # page with the most words (stop words counted).
+        # page with the most words (stop words counted), duplicates skipped.
         # Returns (url, word_count) or none if no pages have been added.
-        if not self._pages:
+        originals = [u for u in self._pages if u not in self._duplicates]
+        if not originals:
             return None
-        url = max(self._pages, key=lambda u: self._pages[u])
+        url = max(originals, key=lambda u: self._pages[u])
         return (url, self._pages[url])
 
     def top_words(self, n=50):
@@ -157,7 +169,8 @@ class Stats:
         # Signs of crawling garbage, as one string. Sections with many pages
         # but few words, many URLs of one shape, or huge word counts are the
         # places to look for traps and filler.
-        lines = [f"Pages: {len(self._pages)}"]
+        lines = [f"Pages: {len(self._pages)}",
+                 f"Duplicate content (left out of words/longest): {len(self._duplicates)}"]
 
         # Same page under http/https, www, or trailing slash variants.
         def plain(u):
@@ -205,9 +218,16 @@ class Stats:
             "word_counts": dict(self._word_counts),
             "subdomains": {h: list(u) for h, u in self._subdomains.items()},
             "anchor_text": dict(self._anchor_text),
+            "duplicates": list(self._duplicates),
+            "seen_hashes": list(self._seen_hashes),
+            "seen_fingerprints": self._seen_fingerprints,
         }
-        with open(path, "w") as f:
+        # Write to a temp file then swap it in, so a crash mid-save can't
+        # leave a half-written stats.json behind.
+        tmp_path = path + ".tmp"
+        with open(tmp_path, "w") as f:
             json.dump(data, f)
+        os.replace(tmp_path, path)
 
     @classmethod
     def load(cls, path):
@@ -220,6 +240,9 @@ class Stats:
             set, {h: set(u) for h, u in data["subdomains"].items()}
         )
         s._anchor_text = defaultdict(list, data.get("anchor_text", {}))
+        s._duplicates = set(data.get("duplicates", []))
+        s._seen_hashes = set(data.get("seen_hashes", []))
+        s._seen_fingerprints = data.get("seen_fingerprints", [])
         return s
 
 

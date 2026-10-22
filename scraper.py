@@ -1,4 +1,6 @@
+import os
 import re
+import sys
 import hashlib
 from collections import Counter, defaultdict
 from os.path import splitext
@@ -19,18 +21,24 @@ _ALLOWED_DOMAINS = {
 # Shared stats object that persist to disk every _SAVE_INTERVAL pages so a
 # crash loses at most that many pages of data.
 _STATS_PATH = "stats.json"
-_SAVE_INTERVAL = 50
+_SAVE_INTERVAL = 10
+
+# --restart wipes the frontier, so old stats would mix with the new crawl.
+# Move them aside to stats.json.bak and start empty.
+if "--restart" in sys.argv and os.path.exists(_STATS_PATH):
+    os.replace(_STATS_PATH, _STATS_PATH + ".bak")
 try:
     stats = Stats.load(_STATS_PATH)
-except Exception:
+except FileNotFoundError:
     stats = Stats()
 
 # Content deduplication that checks MD5 hashes of every page body seen so far.
-_seen_hashes: set = set()
+# Shared with stats so they are saved and reloaded across restarts.
+_seen_hashes: set = stats._seen_hashes
 
 # Near duplicate detection that uses SimHash fingerprints of every page's token list.
 # Two pages whose fingerprints differ by at most this many bits are near dupes.
-_seen_fingerprints: list = []
+_seen_fingerprints: list = stats._seen_fingerprints
 _SIMHASH_THRESHOLD = 3
 
 # Pages with fewer words than this threshold carry too little information to
@@ -82,6 +90,8 @@ _BLOCKED_EXTENSIONS = frozenset({
     "o", "so", "a", "lib", "obj", "class", "wasm", "odt", "ods", "odp",
     "key", "pages",
     "py", "java", "ipynb", "pps",
+    # Game of Life pattern files and bibliography databases
+    "lif", "rle", "ff",
 })
 
 # Robots.txt set that track which domains have been queued, and store the
@@ -216,9 +226,29 @@ def scraper(url, resp):
             ):
                 return []
 
-            # Count every new URL, even duplicates (assignment counts by URL).
             words = tokenize(visible_text(content))
-            if stats.add_page(final_url, words):
+
+            # Exact duplicate
+            content_hash = hashlib.md5(content).hexdigest()
+            is_exact_dup = content_hash in _seen_hashes
+            if not is_exact_dup:
+                _seen_hashes.add(content_hash)
+
+            # Near duplicate detection that flags pages whose token fingerprint is
+            # within _SIMHASH_THRESHOLD bits of any page already seen.
+            # Short pages are skipped since a few words make fingerprints unreliable.
+            is_short = len(words) < _MIN_WORD_COUNT
+            is_near_dup = False
+            if not is_exact_dup and not is_short:
+                fp = simhash(words)
+                is_near_dup = any(hamming_distance(fp, seen) <= _SIMHASH_THRESHOLD
+                                  for seen in _seen_fingerprints)
+                if not is_near_dup:
+                    _seen_fingerprints.append(fp)
+
+            # Count every new URL, even duplicates ,
+            # but duplicates' words stay out of the word counts and longest page.
+            if stats.add_page(final_url, words, duplicate=is_exact_dup or is_near_dup):
                 if stats.unique_count() % _SAVE_INTERVAL == 0:
                     stats.save(_STATS_PATH)
                 _domain_page_counts[crawled_host] += 1
@@ -227,24 +257,10 @@ def scraper(url, resp):
                 if _path_hit_counts[key] >= _PREFIX_TRAP_THRESHOLD:
                     _trap_prefixes.add(key)
 
-            # Exact duplicate: counted, but don't follow its links.
-            content_hash = hashlib.md5(content).hexdigest()
-            if content_hash in _seen_hashes:
+            # Duplicates are counted but their links aren't followed. Neither
+            # are near-empty pages' links, since they rarely lead anywhere useful.
+            if is_exact_dup or is_near_dup or is_short:
                 return []
-            _seen_hashes.add(content_hash)
-
-            # Count the page as visited but don't follow its links when it
-            # has too few words since near-empty pages rarely lead anywhere useful.
-            if len(words) < _MIN_WORD_COUNT:
-                return []
-
-            # Near duplicate detection that skip pages whose token fingerprint is
-            # within _SIMHASH_THRESHOLD bits of any page already seen.
-            fp = simhash(words)
-            if any(hamming_distance(fp, seen) <= _SIMHASH_THRESHOLD
-                   for seen in _seen_fingerprints):
-                return []
-            _seen_fingerprints.append(fp)
 
     return [link for link in links if is_valid(link)]
 
@@ -380,6 +396,16 @@ def is_valid(url):
         if any(v in {"login", "edit", "history", "diff", "attach"} for v in query.get("action", [])):
             return False
         if "diff" in query.get("do", []):
+            return False
+
+        # DokuWiki pages only need ?id=. Every other key (do=index, do=recent,
+        # do=revisions, idx=, ns=...) is a menu or history view of the same page.
+        if "doku.php" in parsed.path and any(k != "id" for k in query):
+            return False
+
+        # Login screens repeat for every page that links to them.
+        path_lower = parsed.path.lower()
+        if any(p in path_lower for p in ("wp-login.php", "/wp-admin", "/noauth/")):
             return False
 
         # Too many query parameters signals a filter/sort combination trap.
