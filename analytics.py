@@ -153,6 +153,52 @@ class Stats:
             lines.append(f"{count} {host}")
         return "\n".join(lines)
 
+    def audit(self, n=15):
+        # Signs of crawling garbage, as one string. Sections with many pages
+        # but few words, many URLs of one shape, or huge word counts are the
+        # places to look for traps and filler.
+        lines = [f"Pages: {len(self._pages)}"]
+
+        # Same page under http/https, www, or trailing slash variants.
+        def plain(u):
+            return u.split("://", 1)[-1].replace("www.", "", 1).rstrip("/")
+        lines.append(f"After merging http/https/www/slash variants: "
+                     f"{len(set(map(plain, self._pages)))}")
+
+        # Share of pages too short to carry real information.
+        short = sum(1 for c in self._pages.values() if c < 50)
+        lines.append(f"Pages under 50 words: {short} "
+                     f"({100 * short / max(len(self._pages), 1):.1f}%)")
+
+        # Group pages by host plus first two path segments.
+        sections = defaultdict(list)
+        for u, c in self._pages.items():
+            p = urlparse(u)
+            segs = [s for s in p.path.split("/") if s][:2]
+            sections[p.netloc.lower() + "/" + "/".join(segs)].append(c)
+        lines.append(f"\nBiggest sections (pages, avg words, % under 50 words):")
+        for sec, counts in sorted(sections.items(), key=lambda kv: -len(kv[1]))[:n]:
+            low = 100 * sum(1 for c in counts if c < 50) / len(counts)
+            lines.append(f"{len(counts):6} {sum(counts) // len(counts):7} {low:5.0f}%  {sec}")
+
+        # URL shapes with digits replaced by #. A big shape is often a trap.
+        shapes = Counter(re.sub(r"\d+", "#", u.split("://", 1)[-1]) for u in self._pages)
+        lines.append(f"\nMost common URL shapes (digits as #):")
+        for shape, count in shapes.most_common(n):
+            lines.append(f"{count:6}  {shape}")
+
+        # Pages with a query string, grouped by host and path.
+        queries = Counter(u.split("?", 1)[0] for u in self._pages if "?" in u)
+        lines.append(f"\nPages with query strings: {sum(queries.values())}")
+        for path, count in queries.most_common(n):
+            lines.append(f"{count:6}  {path}?...")
+
+        # Longest pages. Check the top few by hand for data dumps or garbage.
+        lines.append(f"\nLongest pages:")
+        for u, c in sorted(self._pages.items(), key=lambda kv: -kv[1])[:n]:
+            lines.append(f"{c:7}  {u}")
+        return "\n".join(lines)
+
     def save(self, path):
         data = {
             "pages": self._pages,
@@ -178,6 +224,9 @@ class Stats:
 
 
 # Print the report: python3 analytics.py [stats.json]
+# Print the garbage audit instead: python3 analytics.py --audit [stats.json]
 if __name__ == "__main__":
     import sys
-    print(Stats.load(sys.argv[1] if len(sys.argv) > 1 else "stats.json").report())
+    args = [a for a in sys.argv[1:] if a != "--audit"]
+    s = Stats.load(args[0] if args else "stats.json")
+    print(s.audit() if "--audit" in sys.argv else s.report())
