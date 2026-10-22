@@ -410,6 +410,11 @@ def is_valid(url):
         if any(p in path_lower for p in ("wp-login.php", "/wp-admin", "/noauth/")):
             return False
 
+        # Genealogy records (names, dates, generation codes like 4x/5o) are
+        # ~1000 data pages that drown out real content in the word counts.
+        if "/~dhirschb/genealogy/" in path_lower:
+            return False
+
         # Too many query parameters signals a filter/sort combination trap.
         if len(query) > _MAX_QUERY_PARAMS:
             return False
