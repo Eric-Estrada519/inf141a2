@@ -76,6 +76,9 @@ class Stats:
         # duplicate detection survives a restart.
         self._seen_hashes = set()
         self._seen_fingerprints = []
+        # host -> robots.txt Disallow prefixes. The frontier never refetches a
+        # robots.txt, so these must be saved or they are lost on restart.
+        self._robots_rules = {}
 
     def add_page(self, url, words, duplicate=False):
         # Defragment so /page and /page#section count as one URL.
@@ -221,6 +224,7 @@ class Stats:
             "duplicates": list(self._duplicates),
             "seen_hashes": list(self._seen_hashes),
             "seen_fingerprints": self._seen_fingerprints,
+            "robots_rules": self._robots_rules,
         }
         # Write to a temp file then swap it in, so a crash mid-save can't
         # leave a half-written stats.json behind.
@@ -243,6 +247,7 @@ class Stats:
         s._duplicates = set(data.get("duplicates", []))
         s._seen_hashes = set(data.get("seen_hashes", []))
         s._seen_fingerprints = data.get("seen_fingerprints", [])
+        s._robots_rules = data.get("robots_rules", {})
         return s
 
 

@@ -97,7 +97,7 @@ _BLOCKED_EXTENSIONS = frozenset({
 # Robots.txt set that track which domains have been queued, and store the
 # parsed Disallow rules so is_valid() can honour them.
 _robots_queued: set = set()          # host values already queued
-_robots_rules: dict = {}             # host key is a list of disallowed path prefixes
+_robots_rules: dict = stats._robots_rules  # host -> disallowed path prefixes, saved in stats
 
 # Per-host prefix trap: too many pages under one prefix gets it blocked.
 _path_hit_counts: Counter = Counter()    # (host, prefix) get counted
@@ -285,6 +285,8 @@ def extract_next_links(url, resp):
         host = parsed.netloc.lower().split(":")[0]
         disallows, sitemaps = _parse_robots_txt(content)
         _robots_rules[host] = disallows
+        # Save right away since this host's robots.txt won't be fetched again.
+        stats.save(_STATS_PATH)
         return sitemaps  # absolute only; is_valid() filters non-allowed domains
 
     # Handle sitemap XML( absolute URLs only).
