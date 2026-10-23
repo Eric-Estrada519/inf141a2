@@ -7,7 +7,7 @@ from os.path import splitext
 from urllib.parse import urlparse, urljoin, urldefrag, parse_qs
 from bs4 import BeautifulSoup
 
-from analytics import Stats, tokenize, visible_text
+from analytics import Stats, tokenize, visible_text, STOP_WORDS
 from similarity import simhash, hamming_distance
 
 # Domains the assignment permits crawling.
@@ -100,13 +100,17 @@ _robots_queued: set = set()          # host values already queued
 _robots_rules: dict = stats._robots_rules  # host -> disallowed path prefixes, saved in stats
 
 # Per-host prefix trap: too many pages under one prefix gets it blocked.
+# 300 cut off real sections like ~eppstein/pubs, so this is now only a safety
+# net; the shape cap and trap rules catch actual traps much earlier.
 _path_hit_counts: Counter = Counter()    # (host, prefix) get counted
 _trap_prefixes: set = set()              # (host, prefix) pairs
-_PREFIX_TRAP_THRESHOLD = 300
+_PREFIX_TRAP_THRESHOLD = 1000
 
-# Max pages per host.
-_domain_page_counts: Counter = Counter()  # host -> count
-_DOMAIN_CAP = 3000
+# Max pages per host. 3000 stopped ics.uci.edu (the main host, where the
+# cs/informatics/stat sites also redirect) partway through, so it's set high
+# enough to only catch a runaway host.
+_domain_page_counts: Counter = Counter()  # host to count
+_DOMAIN_CAP = 20000
 
 # Anchor text collected during the most recent extract_next_links call.
 # Cleared each call so scraper() can merge it into stats before filtering.
@@ -226,6 +230,12 @@ def scraper(url, resp):
             ):
                 return []
 
+            # A link can pass is_valid and still redirect somewhere is_valid
+            # would reject (helpdesk tickets redirect to /NoAuth/Login.html), so judge
+            # redirected pages by where they landed.
+            if final_url != url and not is_valid(final_url):
+                return []
+
             words = tokenize(visible_text(content))
 
             # Exact duplicate
@@ -237,10 +247,14 @@ def scraper(url, resp):
             # Near duplicate detection that flags pages whose token fingerprint is
             # within _SIMHASH_THRESHOLD bits of any page already seen.
             # Short pages are skipped since a few words make fingerprints unreliable.
+            # Stop words are left out of the fingerprint: on long pages "the",
+            # "of", "and" outvote everything else and pull unrelated pages
+            # together (gbowker's classification book vs pattis's quotations
+            # were 5 bits apart with them, 16+ without).
             is_short = len(words) < _MIN_WORD_COUNT
             is_near_dup = False
             if not is_exact_dup and not is_short:
-                fp = simhash(words)
+                fp = simhash([w for w in words if w not in STOP_WORDS])
                 is_near_dup = any(hamming_distance(fp, seen) <= _SIMHASH_THRESHOLD
                                   for seen in _seen_fingerprints)
                 if not is_near_dup:
@@ -252,9 +266,12 @@ def scraper(url, resp):
                 if stats.unique_count() % _SAVE_INTERVAL == 0:
                     stats.save(_STATS_PATH)
                 _domain_page_counts[crawled_host] += 1
+                if _domain_page_counts[crawled_host] == _DOMAIN_CAP:
+                    print(f"CAP: host {crawled_host} reached {_DOMAIN_CAP} pages, no more URLs from it")
                 key = (crawled_host, _path_prefix(parsed_final.path))
                 _path_hit_counts[key] += 1
-                if _path_hit_counts[key] >= _PREFIX_TRAP_THRESHOLD:
+                if _path_hit_counts[key] >= _PREFIX_TRAP_THRESHOLD and key not in _trap_prefixes:
+                    print(f"CAP: prefix {key[0]}{key[1]} reached {_PREFIX_TRAP_THRESHOLD} pages, now blocked")
                     _trap_prefixes.add(key)
 
             # Duplicates are counted but their links aren't followed. Neither
@@ -431,11 +448,14 @@ def is_valid(url):
             return False
 
         # Shape cap so it count distinct URLs only, so repeat links don't use it up.
-        shape_urls = _shape_urls[re.sub(r"\d+", "#", host + parsed.path + "?" + parsed.query)]
+        shape = re.sub(r"\d+", "#", host + parsed.path + "?" + parsed.query)
+        shape_urls = _shape_urls[shape]
         if url not in shape_urls:
             if len(shape_urls) >= _SHAPE_CAP:
                 return False
             shape_urls.add(url)
+            if len(shape_urls) == _SHAPE_CAP:
+                print(f"CAP: URL shape {shape} reached {_SHAPE_CAP} URLs, no more like it")
         return True
 
     except TypeError:

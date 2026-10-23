@@ -6,15 +6,16 @@ from urllib.parse import urldefrag, urlparse
 
 from bs4 import BeautifulSoup
 
-# English stop words (ranks.nl list). These are excluded from the word-frequency
-# counts so common filler words don't dominate the top-50 report.
+# English stop words, exactly the ranks.nl list linked in the assignment.
+# These are excluded from the word-frequency counts so common filler words
+# don't dominate the top-50 report.
 STOP_WORDS = {
     "a", "about", "above", "after", "again", "against", "all", "am", "an",
     "and", "any", "are", "aren't", "as", "at", "be", "because", "been",
     "before", "being", "below", "between", "both", "but", "by", "can't",
     "cannot", "could", "couldn't", "did", "didn't", "do", "does", "doesn't",
     "doing", "don't", "down", "during", "each", "few", "for", "from",
-    "further", "get", "got", "had", "hadn't", "has", "hasn't", "have",
+    "further", "had", "hadn't", "has", "hasn't", "have",
     "haven't", "having", "he", "he'd", "he'll", "he's", "her", "here",
     "here's", "hers", "herself", "him", "himself", "his", "how", "how's",
     "i", "i'd", "i'll", "i'm", "i've", "if", "in", "into", "is", "isn't",
@@ -28,7 +29,7 @@ STOP_WORDS = {
     "those", "through", "to", "too", "under", "until", "up", "very", "was",
     "wasn't", "we", "we'd", "we'll", "we're", "we've", "were", "weren't",
     "what", "what's", "when", "when's", "where", "where's", "which", "while",
-    "who", "who's", "whom", "why", "why's", "will", "with", "won't", "would",
+    "who", "who's", "whom", "why", "why's", "with", "won't", "would",
     "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your",
     "yours", "yourself", "yourselves",
 }
@@ -54,10 +55,13 @@ def visible_text(html_bytes):
 
 
 def tokenize(text):
-    # pull out runs of alphanumeric characters( in lowercase).
+    # pull out runs of ASCII letters and digits (in lowercase); any other
+    # character, including non-ASCII ones, separates tokens.
     # Apostrophes are kept so "it's" stays one token instead of becoming
-    # ["it", "s"].
-    return re.findall(r"[a-z0-9]+(?:'[a-z0-9]+)*", text.lower())
+    # ["it", "s"]. WordPress writes curly apostrophes (don’t), so those are
+    # turned into straight ones first or they'd split into "don" + "t".
+    text = text.lower().replace("’", "'").replace("‘", "'")
+    return re.findall(r"[a-z0-9]+(?:'[a-z0-9]+)*", text)
 
 
 class Stats:
@@ -210,9 +214,11 @@ class Stats:
             lines.append(f"{count:6}  {path}?...")
 
         # Longest pages. Check the top few by hand for data dumps or garbage.
+        # Duplicates are marked since they can't be the report's longest page.
         lines.append(f"\nLongest pages:")
         for u, c in sorted(self._pages.items(), key=lambda kv: -kv[1])[:n]:
-            lines.append(f"{c:7}  {u}")
+            mark = "  (duplicate)" if u in self._duplicates else ""
+            lines.append(f"{c:7}  {u}{mark}")
         return "\n".join(lines)
 
     def save(self, path):
