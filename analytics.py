@@ -6,7 +6,7 @@ from urllib.parse import urldefrag, urlparse
 
 from bs4 import BeautifulSoup
 
-# English stop words, exactly the ranks.nl list linked in the assignment.
+# English stop words: the ranks.nl list plus a few meaningless filler words.
 # These are excluded from the word-frequency counts so common filler words
 # don't dominate the top-50 report.
 STOP_WORDS = {
@@ -32,6 +32,8 @@ STOP_WORDS = {
     "who", "who's", "whom", "why", "why's", "with", "won't", "would",
     "wouldn't", "you", "you'd", "you'll", "you're", "you've", "your",
     "yours", "yourself", "yourselves",
+    "will", "can", "may", "need", "also", "like", "one", "two", "first",
+    "new", "us", "use", "using",
 }
 
 
