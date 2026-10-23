@@ -74,7 +74,7 @@ class Stats:
         # target url -> list of anchor texts pointing at it
         self._anchor_text = defaultdict(list)
         # URLs whose content duplicated an earlier page. They count as unique
-        # pages but their words and length are left out of the report.
+        # pages but their words are left out of the top 50.
         self._duplicates = set()
         # MD5 hashes and SimHash fingerprints of pages seen so far, saved so
         # duplicate detection survives a restart.
@@ -120,12 +120,14 @@ class Stats:
         return len(self._pages)
 
     def longest_page(self):
-        # page with the most words (stop words counted), duplicates skipped.
+        # page with the most words (stop words counted).
+        # Duplicates are included: every URL is a page per the spec, and a near
+        # duplicate can be longer than the page it resembles (eppstein's
+        # pubs/all.html is a superset of geom-all.html).
         # Returns (url, word_count) or none if no pages have been added.
-        originals = [u for u in self._pages if u not in self._duplicates]
-        if not originals:
+        if not self._pages:
             return None
-        url = max(originals, key=lambda u: self._pages[u])
+        url = max(self._pages, key=lambda u: self._pages[u])
         return (url, self._pages[url])
 
     def top_words(self, n=50):
@@ -177,7 +179,7 @@ class Stats:
         # but few words, many URLs of one shape, or huge word counts are the
         # places to look for traps and filler.
         lines = [f"Pages: {len(self._pages)}",
-                 f"Duplicate content (left out of words/longest): {len(self._duplicates)}"]
+                 f"Duplicate content (left out of word counts): {len(self._duplicates)}"]
 
         # Same page under http/https, www, or trailing slash variants.
         def plain(u):
@@ -214,7 +216,7 @@ class Stats:
             lines.append(f"{count:6}  {path}?...")
 
         # Longest pages. Check the top few by hand for data dumps or garbage.
-        # Duplicates are marked since they can't be the report's longest page.
+        # Duplicates are marked since their words are left out of the top 50.
         lines.append(f"\nLongest pages:")
         for u, c in sorted(self._pages.items(), key=lambda kv: -kv[1])[:n]:
             mark = "  (duplicate)" if u in self._duplicates else ""

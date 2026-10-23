@@ -447,6 +447,11 @@ def is_valid(url):
         if "/attachment/" in parsed.path.lower() or "attachment_id" in query:
             return False
 
+        # PowerPoint exports make one sld###.htm page per
+        # slide whose only text is "<title> slide 3 of 11" .
+        if re.search(r"/sld\d+\.html?$", path_lower):
+            return False
+
         # Shape cap so it count distinct URLs only, so repeat links don't use it up.
         shape = re.sub(r"\d+", "#", host + parsed.path + "?" + parsed.query)
         shape_urls = _shape_urls[shape]
