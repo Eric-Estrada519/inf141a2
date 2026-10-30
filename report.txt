@@ -42,7 +42,6 @@ Top 50 words:
 38. machine - 4985
 39. problem - 4984
 40. set - 4896
-40. set - 4896
 41. see - 4890
 42. uc - 4816
 43. home - 4739
