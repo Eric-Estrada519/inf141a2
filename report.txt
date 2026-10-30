@@ -1,72 +1,73 @@
-Unique pages: 8900
+Unique pages: 8730
 Longest page: https://ics.uci.edu/~eppstein/pubs/all.html (40125 words)
 
 Top 50 words:
-1. ics - 16272
-2. data - 13000
-3. research - 12457
-4. uci - 12068
-5. information - 11950
-6. computer - 11271
-7. time - 10507
-8. students - 8757
-9. ramesh - 8464
-10. software - 7973
-11. learning - 7947
-12. project - 7929
-13. events - 7741
-14. systems - 7699
-15. program - 7476
-16. science - 7402
-17. search - 7351
-18. course - 7137
-19. irvine - 7135
-20. work - 6820
-21. computing - 6713
-22. current - 6318
-23. jain - 6265
-24. edu - 6187
-25. university - 6104
-26. news - 5858
-27. file - 5608
-28. class - 5517
-29. code - 5454
-30. list - 5425
-31. based - 5186
-32. people - 5173
-33. system - 5162
-34. number - 5148
-35. eppstein - 5070
-36. algorithms - 5069
-37. past - 5028
-38. machine - 4985
-39. problem - 4984
-40. set - 4896
-41. see - 4890
-42. uc - 4816
-43. home - 4739
-44. make - 4678
-45. paper - 4667
-46. many - 4649
-47. group - 4640
-48. contact - 4634
-49. pdf - 4619
-50. projects - 4568
+1. ics - 16039
+2. data - 12829
+3. research - 12230
+4. uci - 11962
+5. information - 11747
+6. computer - 11015
+7. time - 10453
+8. students - 8616
+9. ramesh - 8463
+10. project - 7901
+11. software - 7827
+12. learning - 7803
+13. systems - 7530
+14. program - 7359
+15. science - 7216
+16. search - 7165
+17. course - 7097
+18. irvine - 6948
+19. work - 6722
+20. computing - 6643
+21. events - 6566
+22. current - 6268
+23. jain - 6268
+24. edu - 6193
+25. university - 6053
+26. news - 5817
+27. file - 5550
+28. class - 5490
+29. code - 5455
+30. list - 5327
+31. number - 5136
+32. based - 5132
+33. people - 5128
+34. system - 5098
+35. eppstein - 5087
+36. algorithms - 5053
+37. past - 4998
+38. problem - 4973
+39. machine - 4909
+40. set - 4886
+41. see - 4862
+42. uc - 4669
+43. home - 4647
+44. paper - 4638
+45. many - 4624
+46. pdf - 4615
+47. make - 4614
+48. group - 4602
+49. projects - 4508
+50. contact - 4478
 
-ics.uci.edu subdomains: 85
+ics.uci.edu subdomains: 86
 http://accessibility.ics.uci.edu, 6
 http://acoi.ics.uci.edu, 118
 http://archive-beta.ics.uci.edu, 11
-http://archive.ics.uci.edu, 217
+http://archive.ics.uci.edu, 216
 http://asterix.ics.uci.edu, 14
+http://bit.ics.uci.edu, 1
 http://casa.ics.uci.edu, 5
-http://cert.ics.uci.edu, 18
+http://cert.ics.uci.edu, 10
 http://checkin.ics.uci.edu, 3
 http://chenli.ics.uci.edu, 13
 http://cloudberry.ics.uci.edu, 4
 http://cml.ics.uci.edu, 178
 http://code.ics.uci.edu, 27
-http://computableplant.ics.uci.edu, 80
+http://computableplant.ics.uci.edu, 83
 http://containers.ics.uci.edu, 1
 http://courselisting.ics.uci.edu, 2
 http://cradl.ics.uci.edu, 16
@@ -76,16 +77,16 @@ http://dale-cooper-v0.ics.uci.edu, 17
 http://dgillen.ics.uci.edu, 33
 http://ds4all.ics.uci.edu, 11
 http://duttgroup.ics.uci.edu, 124
-http://dynamo.ics.uci.edu, 1
+http://dynamo.ics.uci.edu, 32
 http://e2.ics.uci.edu, 1
 http://edgelab.ics.uci.edu, 12
 http://emj.ics.uci.edu, 32
 http://evoke.ics.uci.edu, 4
-http://flamingo.ics.uci.edu, 83
+http://flamingo.ics.uci.edu, 84
 http://fr.ics.uci.edu, 3
 http://gitlab.ics.uci.edu, 1
 http://gradinfo.ics.uci.edu, 1
-http://grape.ics.uci.edu, 125
+http://grape.ics.uci.edu, 123
 http://graphics.ics.uci.edu, 1
 http://hack.ics.uci.edu, 1
 http://hobbes.ics.uci.edu, 10
@@ -94,12 +95,12 @@ http://hub.ics.uci.edu, 3
 http://i-sensorium.ics.uci.edu, 5
 http://iasl.ics.uci.edu, 25
 http://icde2023.ics.uci.edu, 62
-http://ics.uci.edu, 3695
+http://ics.uci.edu, 3565
 http://industryshowcase.ics.uci.edu, 32
 http://informatics.ics.uci.edu, 27
 http://intranet.ics.uci.edu, 15
 http://ipubmed.ics.uci.edu, 1
-http://isg.ics.uci.edu, 306
+http://isg.ics.uci.edu, 293
 http://isi-buds.ics.uci.edu, 5
 http://jgarcia.ics.uci.edu, 40
 http://julia-hub.ics.uci.edu, 1
@@ -110,18 +111,18 @@ http://mcs.ics.uci.edu, 12
 http://mds.ics.uci.edu, 9
 http://mhcid.ics.uci.edu, 17
 http://mover.ics.uci.edu, 23
-http://mswe.ics.uci.edu, 8
+http://mswe.ics.uci.edu, 9
 http://myip.ics.uci.edu, 1
 http://nalini.ics.uci.edu, 10
 http://netreg.ics.uci.edu, 1
-http://ngs.ics.uci.edu, 1439
+http://ngs.ics.uci.edu, 1436
 http://oai.ics.uci.edu, 6
 http://onboarding.ics.uci.edu, 1
 http://password.ics.uci.edu, 8
 http://riscit.ics.uci.edu, 3
 http://sana.ics.uci.edu, 4
 http://scale.ics.uci.edu, 7
-http://seal.ics.uci.edu, 11
+http://seal.ics.uci.edu, 46
 http://sherlock.ics.uci.edu, 7
 http://signage.ics.uci.edu, 1
 http://sparcfire.ics.uci.edu, 3
@@ -135,29 +136,31 @@ http://tastier.ics.uci.edu, 1
 http://tutoring.ics.uci.edu, 2
 http://unite.ics.uci.edu, 14
 http://vision.ics.uci.edu, 220
-http://wics.ics.uci.edu, 614
+http://wics.ics.uci.edu, 529
 http://wiki.ics.uci.edu, 940
 http://www-db.ics.uci.edu, 25
 http://xtune.ics.uci.edu, 6
 
 Pages per host:
-3695 ics.uci.edu
-1439 ngs.ics.uci.edu
+3565 ics.uci.edu
+1436 ngs.ics.uci.edu
 940 wiki.ics.uci.edu
-614 wics.ics.uci.edu
-306 isg.ics.uci.edu
+529 wics.ics.uci.edu
+293 isg.ics.uci.edu
 220 vision.ics.uci.edu
-217 archive.ics.uci.edu
+216 archive.ics.uci.edu
 178 cml.ics.uci.edu
-125 grape.ics.uci.edu
 124 duttgroup.ics.uci.edu
+123 grape.ics.uci.edu
 118 acoi.ics.uci.edu
-83 flamingo.ics.uci.edu
-80 computableplant.ics.uci.edu
+84 flamingo.ics.uci.edu
+83 computableplant.ics.uci.edu
 62 icde2023.ics.uci.edu
+46 seal.ics.uci.edu
 40 jgarcia.ics.uci.edu
 38 mailman.ics.uci.edu
 33 dgillen.ics.uci.edu
+32 dynamo.ics.uci.edu
 32 emj.ics.uci.edu
 32 industryshowcase.ics.uci.edu
 27 code.ics.uci.edu
@@ -165,7 +168,6 @@ Pages per host:
 25 iasl.ics.uci.edu
 25 www-db.ics.uci.edu
 23 mover.ics.uci.edu
-18 cert.ics.uci.edu
 17 dale-cooper-v0.ics.uci.edu
 17 mhcid.ics.uci.edu
 16 cradl.ics.uci.edu
@@ -181,13 +183,13 @@ Pages per host:
 11 archive-beta.ics.uci.edu
 11 ds4all.ics.uci.edu
 11 hpi.ics.uci.edu
-11 seal.ics.uci.edu
 11 summeracademy.ics.uci.edu
+10 cert.ics.uci.edu
 10 hobbes.ics.uci.edu
 10 nalini.ics.uci.edu
 9 mds.ics.uci.edu
+9 mswe.ics.uci.edu
 9 stat.ics.uci.edu
-8 mswe.ics.uci.edu
 8 password.ics.uci.edu
 7 scale.ics.uci.edu
 7 sherlock.ics.uci.edu
@@ -209,8 +211,8 @@ Pages per host:
 3 stairs.ics.uci.edu
 2 courselisting.ics.uci.edu
 2 tutoring.ics.uci.edu
+1 bit.ics.uci.edu
 1 containers.ics.uci.edu
-1 dynamo.ics.uci.edu
 1 e2.ics.uci.edu
 1 gitlab.ics.uci.edu
 1 gradinfo.ics.uci.edu
