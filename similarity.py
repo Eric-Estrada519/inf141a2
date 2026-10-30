@@ -6,20 +6,19 @@ def exact_hash(words):
     """Deterministic integer checksum of the exact word sequence.
 
     Two pages with the same tokens in the same order produce the same value.
-    Order matters( ['cat', 'dog'] doesn't equal ['dog', 'cat'] )
+    Order matters (['cat', 'dog'] doesn't equal ['dog', 'cat']).
     """
     return int(hashlib.md5(" ".join(words).encode()).hexdigest(), 16)
 
 
 def simhash(words, bits=64):
-    """Return a bits wide SimHash print for a list of words.
+    """Return a SimHash fingerprint for a list of words.
 
-    Each unique word contributes + or - frequency to each bit position
-    depending on that bit in the word's MD5 hash. The final fingerprint sets
-    bit i to 1 if the accumulated vote for position i is positive.
+    Each word votes +count or -count on every bit based on its MD5 hash.
+    A bit is 1 if its total vote is positive.
 
-    Two pages that share most of their vocabulary will have fingerprints with
-    a small Hamming distance. Completely different pages will differ in 32 bits.
+    Similar pages get fingerprints only a few bits apart. Totally different
+    pages differ in about 32 bits on average.
     """
     vector = [0] * bits
     for word, count in Counter(words).items():

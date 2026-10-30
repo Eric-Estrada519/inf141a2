@@ -18,7 +18,7 @@ _ALLOWED_DOMAINS = {
     "stat.uci.edu",
 }
 
-# Shared stats object that persist to disk every _SAVE_INTERVAL pages so a
+# Shared stats object that persists to disk every _SAVE_INTERVAL pages so a
 # crash loses at most that many pages of data.
 _STATS_PATH = "stats.json"
 _SAVE_INTERVAL = 10
@@ -49,24 +49,15 @@ _MIN_WORD_COUNT = 50
 # content traps so we skip them rather than feeding 5+ MB to BeautifulSoup.
 MAX_CONTENT_BYTES = 5 * 1024 * 1024  # 5 MB
 
-# Query parameter keys that always signal a trap regardless of their value.
-# login/edit forms, calendar feeds, social-share variants, and wiki diffs.
+# Query keys that always mean a trap, no matter the value.
 _TRAP_QUERY_KEYS = frozenset({
     "share", "ical", "outlook-ical", "tribe-bar-date", "replytocom", "rev",
-    # Wiki revision and format variants — one URL per edit/format
-    "version", "format",
-    # DokuWiki media manager
-    "tab_files", "tab_details", "image",
-    # Apache directory listing sort order  same directory, 4 sort variants
-    "C",
-    # Trac wiki timeline — infinite variants by timestamp and granularity
-    "precision", "daysback",
-    # WordPress Events Calendar views (day/list/month pagination)
+    "version", "format", "tab_files", "tab_details", "image",
+    "C", "precision", "daysback",
     "eventDisplay", "tribe_paged", "tribe_eventcategory",
 })
 
-# File extensions that are never worth downloading
-# Frozenset lookup is O(1).
+# File extensions that are never worth downloading.
 _BLOCKED_EXTENSIONS = frozenset({
     "css", "js", "bmp", "gif", "jpeg", "jpg", "ico", "png",
     "tif", "tiff", "mid", "mp2", "mp3", "mp4", "wav", "avi",
@@ -77,23 +68,14 @@ _BLOCKED_EXTENSIONS = frozenset({
     "tgz", "sha1", "thmx", "mso", "arff", "rtf", "jar", "csv",
     "rm", "smil", "wmv", "swf", "wma", "zip", "rar", "gz",
     "ppsx", "odc", "sql", "mpg", "war", "apk", "img", "bam",
-    "c", "cc", "cpp", "h", "hpp",
-    # VM and disk images that are multi GB downloads that crash the crawler
-    "ova", "ovf", "vmdk", "vdi", "qcow2", "vhd", "vhdx",
-    # Other compressed archives and software installers
+    "c", "cc", "cpp", "h", "hpp", "ova", "ovf", "vmdk", "vdi",
     "xz", "lz", "lzma", "zst", "txz", "tbz", "tbz2", "deb", "rpm", "pkg",
-    # Research data and ML model files that can be hundreds of MB
     "npy", "npz", "h5", "hdf5", "mat", "pkl", "pickle", "parquet", "pt",
     "pth", "ckpt", "onnx", "safetensors", "pcap", "nc", "sav", "rds",
-    # Audio, video, image, and font formats the list above missed
     "webm", "flv", "mkv", "3gp", "flac", "aac", "m4a", "webp", "heic",
-    "svg", "woff", "woff2", "ttf", "otf",
-    # Compiled binaries and office formats with no useful HTML text
+    "svg", "woff", "woff2", "ttf", "otf", "qcow2", "vhd", "vhdx",
     "o", "so", "a", "lib", "obj", "class", "wasm", "odt", "ods", "odp",
-    "key", "pages",
-    "py", "java", "ipynb", "pps",
-    # Game of Life pattern files and bibliography databases
-    "lif", "rle", "ff",
+    "key", "pages", "py", "java", "ipynb", "pps", "lif", "rle", "ff",
 })
 
 # Robots.txt set that track which domains have been queued, and store the
@@ -101,16 +83,13 @@ _BLOCKED_EXTENSIONS = frozenset({
 _robots_queued: set = set()          # host values already queued
 _robots_rules: dict = stats._robots_rules  # host -> disallowed path prefixes, saved in stats
 
-# Per-host prefix trap: too many pages under one prefix gets it blocked.
-# 300 cut off real sections like ~eppstein/pubs, so this is now only a safety
-# net; the shape cap and trap rules catch actual traps much earlier.
+# Too many pages under one prefix gets it blocked. Set high since it's just
+# a safety net; the shape cap and trap rules catch real traps first.
 _path_hit_counts: Counter = Counter()    # (host, prefix) get counted
 _trap_prefixes: set = set()              # (host, prefix) pairs
 _PREFIX_TRAP_THRESHOLD = 1000
 
-# Max pages per host. 3000 stopped ics.uci.edu (the main host, where the
-# cs/informatics/stat sites also redirect) partway through, so it's set high
-# enough to only catch a runaway host.
+# Max pages per host. Set high so it only stops a runaway host.
 _domain_page_counts: Counter = Counter()  # host to count
 _DOMAIN_CAP = 20000
 
@@ -246,13 +225,9 @@ def scraper(url, resp):
             if not is_exact_dup:
                 _seen_hashes.add(content_hash)
 
-            # Near duplicate detection that flags pages whose token fingerprint is
-            # within _SIMHASH_THRESHOLD bits of any page already seen.
-            # Short pages are skipped since a few words make fingerprints unreliable.
-            # Stop words are left out of the fingerprint: on long pages "the",
-            # "of", "and" outvote everything else and pull unrelated pages
-            # together (gbowker's classification book vs pattis's quotations
-            # were 5 bits apart with them, 16+ without).
+            # Near duplicate if within _SIMHASH_THRESHOLD bits of a seen page.
+            # Short pages are skipped, and stop words are left out so they
+            # don't make unrelated long pages look the same.
             is_short = len(words) < _MIN_WORD_COUNT
             is_near_dup = False
             if not is_exact_dup and not is_short:
@@ -262,8 +237,8 @@ def scraper(url, resp):
                 if not is_near_dup:
                     _seen_fingerprints.append(fp)
 
-            # Count every new URL, even duplicates ,
-            # but duplicates' words stay out of the word counts and longest page.
+            # Count every new URL, even duplicates,
+            # but duplicates' words stay out of the word counts.
             if stats.add_page(final_url, words, duplicate=is_exact_dup or is_near_dup):
                 if stats.unique_count() % _SAVE_INTERVAL == 0:
                     stats.save(_STATS_PATH)
@@ -308,7 +283,7 @@ def extract_next_links(url, resp):
         stats.save(_STATS_PATH)
         return sitemaps  # absolute only; is_valid() filters non-allowed domains
 
-    # Handle sitemap XML( absolute URLs only).
+    # Handle sitemap XML (absolute URLs only).
     if "xml" in content_type or url.endswith(".xml"):
         return _parse_sitemap_xml(content)
 
@@ -378,8 +353,7 @@ def is_valid(url):
 
         host = parsed.netloc.lower().split(":")[0]
 
-        # Accept the host only if it equals an allowed domain exactly, or if
-        # it ends with ".<allowed domain>". The dot prefix is required.
+        # The dot is required so a host like "fakeics.uci.edu" doesn't match.
         if not any(
             host == domain or host.endswith("." + domain)
             for domain in _ALLOWED_DOMAINS
@@ -409,8 +383,8 @@ def is_valid(url):
         if path_segments and max(path_segments.count(s) for s in set(path_segments)) >= 3:
             return False
 
-        # Trap catch that query parameters that generate login walls, calendar feeds,
-        # social share variants, or edit/diff views of the same page.
+        # Trap catch for query params that make login walls, calendar feeds,
+        # share links, or edit/diff views of the same page.
         query = parse_qs(parsed.query, keep_blank_values=True)
         if any(k in query for k in _TRAP_QUERY_KEYS):
             return False
@@ -434,7 +408,7 @@ def is_valid(url):
             return False
 
         # Genealogy records (names, dates, generation codes like 4x/5o) are
-        # ~1000 data pages that drown out real content in the word counts.
+        # 1000's data pages that drown out real content in the word counts.
         if "/~dhirschb/genealogy/" in path_lower:
             return False
 
@@ -454,11 +428,11 @@ def is_valid(url):
             return False
 
         # PowerPoint exports make one sld###.htm page per
-        # slide whose only text is "<title> slide 3 of 11" .
+        # slide whose only text is "title slide 3 of 11" .
         if re.search(r"/sld\d+\.html?$", path_lower):
             return False
 
-        # Shape cap so it count distinct URLs only, so repeat links don't use it up.
+        # Shape cap counts distinct URLs only, so repeat links don't use it up.
         shape = re.sub(r"\d+", "#", host + parsed.path + "?" + parsed.query)
         shape_urls = _shape_urls[shape]
         if url not in shape_urls:

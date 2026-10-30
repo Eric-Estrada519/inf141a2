@@ -6,9 +6,7 @@ from urllib.parse import urldefrag, urlparse
 
 from bs4 import BeautifulSoup
 
-# English stop words: the ranks.nl list plus a few meaningless filler words.
-# These are excluded from the word-frequency counts so common filler words
-# don't dominate the top-50 report.
+# Stop words (ranks.nl list plus some filler) left out of the top 50 words.
 STOP_WORDS = {
     "a", "about", "above", "after", "again", "against", "all", "am", "an",
     "and", "any", "are", "aren't", "as", "at", "be", "because", "been",
@@ -38,10 +36,9 @@ STOP_WORDS = {
 
 
 def visible_text(html_bytes):
-    # Strip tags whose content is never visible to the user, then return
-    # the remaining text with words separated by a single space.
-    # Old Word exported pages can be UTF-16 with no BOM, so every other byte
-    # is a null. Undecoded, they turn into single letter garbage tokens.
+    # Return the page text without script/style tags.
+    # Old Word pages can be UTF-16 (every other byte is null), so decode those
+    # first or they turn into single letter garbage.
     if isinstance(html_bytes, bytes):
         if html_bytes[1:400:2].count(0) > 100:
             html_bytes = html_bytes.decode("utf-16-le", errors="ignore")
@@ -57,11 +54,8 @@ def visible_text(html_bytes):
 
 
 def tokenize(text):
-    # pull out runs of ASCII letters and digits (in lowercase); any other
-    # character, including non-ASCII ones, separates tokens.
-    # Apostrophes are kept so "it's" stays one token instead of becoming
-    # ["it", "s"]. WordPress writes curly apostrophes (don’t), so those are
-    # turned into straight ones first or they'd split into "don" + "t".
+    # Lowercase runs of letters/digits. Apostrophes are kept so "don't" stays
+    # one word (curly ones are made straight first).
     text = text.lower().replace("’", "'").replace("‘", "'")
     return re.findall(r"[a-z0-9]+(?:'[a-z0-9]+)*", text)
 
@@ -122,11 +116,9 @@ class Stats:
         return len(self._pages)
 
     def longest_page(self):
-        # page with the most words (stop words counted).
-        # Duplicates are included: every URL is a page per the spec, and a near
-        # duplicate can be longer than the page it resembles (eppstein's
-        # pubs/all.html is a superset of geom-all.html).
-        # Returns (url, word_count) or none if no pages have been added.
+        # Page with the most words (stop words counted). Duplicates are
+        # included since every URL counts as a page.
+        # Returns (url, word_count) or None if there are no pages.
         if not self._pages:
             return None
         url = max(self._pages, key=lambda u: self._pages[u])
