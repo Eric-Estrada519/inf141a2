@@ -81,7 +81,7 @@ _BLOCKED_EXTENSIONS = frozenset({
 # Robots.txt set that track which domains have been queued, and store the
 # parsed Disallow rules so is_valid() can honour them.
 _robots_queued: set = set()          # host values already queued
-_robots_rules: dict = stats._robots_rules  # host -> disallowed path prefixes, saved in stats
+_robots_rules: dict = stats._robots_rules  # host to disallowed path prefixes, saved in stats
 
 # Too many pages under one prefix gets it blocked. Set high since it's just
 # a safety net; the shape cap and trap rules catch real traps first.
@@ -212,8 +212,7 @@ def scraper(url, resp):
                 return []
 
             # A link can pass is_valid and still redirect somewhere is_valid
-            # would reject (helpdesk tickets redirect to /NoAuth/Login.html), so judge
-            # redirected pages by where they landed.
+            # would reject, so judge redirected pages by where they landed.
             if final_url != url and not is_valid(final_url):
                 return []
 

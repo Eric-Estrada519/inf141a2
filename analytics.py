@@ -37,7 +37,7 @@ STOP_WORDS = {
 
 def visible_text(html_bytes):
     # Return the page text without script/style tags.
-    # Old Word pages can be UTF-16 (every other byte is null), so decode those
+    # Old Word pages can be UTF-16, so decode those
     # first or they turn into single letter garbage.
     if isinstance(html_bytes, bytes):
         if html_bytes[1:400:2].count(0) > 100:
@@ -55,7 +55,7 @@ def visible_text(html_bytes):
 
 def tokenize(text):
     # Lowercase runs of letters/digits. Apostrophes are kept so "don't" stays
-    # one word (curly ones are made straight first).
+    # one word.
     text = text.lower().replace("’", "'").replace("‘", "'")
     return re.findall(r"[a-z0-9]+(?:'[a-z0-9]+)*", text)
 
@@ -67,7 +67,7 @@ class Stats:
         self._word_counts = Counter()
         # ics host is a set of unique page URLs.
         self._subdomains = defaultdict(set)
-        # target url -> list of anchor texts pointing at it
+        # target url: list of anchor texts pointing at it
         self._anchor_text = defaultdict(list)
         # URLs whose content duplicated an earlier page. They count as unique
         # pages but their words are left out of the top 50.
@@ -76,7 +76,7 @@ class Stats:
         # duplicate detection survives a restart.
         self._seen_hashes = set()
         self._seen_fingerprints = []
-        # host -> robots.txt Disallow prefixes. The frontier never refetches a
+        # host: robots.txt Disallow prefixes. The frontier never refetches a
         # robots.txt, so these must be saved or they are lost on restart.
         self._robots_rules = {}
 
@@ -125,7 +125,7 @@ class Stats:
         return (url, self._pages[url])
 
     def top_words(self, n=50):
-        # n most frequent non-stop words.
+        # n most frequent nonstop words.
         # Pure numbers and single characters are skipped since they aren't words.
         # Ties are broken alphabetically so the result is deterministic.
         return sorted(
@@ -142,7 +142,7 @@ class Stats:
         )
 
     def host_counts(self):
-        # page count per host (all domains), most pages first.
+        # page count per host, most pages first.
         counts = Counter(urlparse(u).netloc.lower().split(":")[0] for u in self._pages)
         return sorted(counts.items(), key=lambda pair: (-pair[1], pair[0]))
 
@@ -169,7 +169,7 @@ class Stats:
         return "\n".join(lines)
 
     def audit(self, n=15):
-        # Signs of crawling garbage, as one string. Sections with many pages
+        # Signs of crawling garbage as one string. Sections with many pages
         # but few words, many URLs of one shape, or huge word counts are the
         # places to look for traps and filler.
         lines = [f"Pages: {len(self._pages)}",
@@ -253,8 +253,7 @@ class Stats:
         return s
 
 
-# Print the report: python3 analytics.py [stats.json]
-# Print the garbage audit instead: python3 analytics.py --audit [stats.json]
+# Prints a report or a audit
 if __name__ == "__main__":
     import sys
     args = [a for a in sys.argv[1:] if a != "--audit"]
