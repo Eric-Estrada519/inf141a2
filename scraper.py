@@ -61,6 +61,8 @@ _TRAP_QUERY_KEYS = frozenset({
     "C",
     # Trac wiki timeline — infinite variants by timestamp and granularity
     "precision", "daysback",
+    # WordPress Events Calendar views (day/list/month pagination)
+    "eventDisplay", "tribe_paged", "tribe_eventcategory",
 })
 
 # File extensions that are never worth downloading
@@ -400,7 +402,7 @@ def is_valid(url):
         # News articles have a slug after the date and are NOT blocked.
         if re.search(r"/\d{4}/\d{2}(/\d{2})?/?$", parsed.path):
             return False
-        if re.search(r"/\d{4}-\d{2}-\d{2}", parsed.path):
+        if re.search(r"/\d{4}-\d{2}(-\d{2}|/|$)", parsed.path):
             return False
 
         path_segments = [s for s in parsed.path.split("/") if s]
@@ -425,6 +427,10 @@ def is_valid(url):
         # Login screens repeat for every page that links to them.
         path_lower = parsed.path.lower()
         if any(p in path_lower for p in ("wp-login.php", "/wp-admin", "/noauth/")):
+            return False
+
+        # Events Calendar list/month/day views re-show the same events endlessly.
+        if re.search(r"/events/(.*/)?(list|month|day|week|photo|today)(/|$)", path_lower):
             return False
 
         # Genealogy records (names, dates, generation codes like 4x/5o) are
